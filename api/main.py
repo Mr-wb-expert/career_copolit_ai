@@ -106,15 +106,18 @@ def _run_pipeline_sync(job_id: str, resume_text: str, websites: str, user_query:
 
         result = CareerCopilotAi().crew().kickoff(inputs=inputs)
 
+        # Extract the structured job results from the specific task output
+        # (Since it's not the last task, we look into tasks_output)
+        job_output = next((o for o in result.tasks_output if o.description.lower().find('ats') != -1 or o.description.lower().find('score') != -1), None)
         
-        _session["job_results"] = result.pydantic
+        _session["job_results"] = job_output.pydantic if job_output else result.pydantic
         _session["raw_jobs_md"] = result.raw
 
         _pipeline_jobs[job_id] = {
             "status": "done",
             "result": {
                 "raw": result.raw,
-                "jobs": result.pydantic.model_dump() if result.pydantic else None,
+                "jobs": _session["job_results"].model_dump() if _session["job_results"] else None,
             },
             "error": None,
             "completed_at": datetime.utcnow().isoformat(),

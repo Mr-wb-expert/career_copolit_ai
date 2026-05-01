@@ -1,6 +1,6 @@
 // CareerCopilot AI - Enhanced Frontend JavaScript
 // API Base URL - adjust for production
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://careercopolitai-production.up.railway.app';
 
 // State
 let currentJobId = null;
@@ -394,8 +394,19 @@ async function fetchJobs() {
             emptyState.classList.add('hidden');
             container.classList.remove('hidden');
 
-            if (data.jobs || data.raw_markdown) {
-                const jobs = parseJobsFromMarkdown(data.raw_markdown || '');
+            if (data.jobs && data.jobs.top_jobs) {
+                const jobs = data.jobs.top_jobs.map(j => ({
+                    title: j.job_title,
+                    company: j.company,
+                    link: j.link,
+                    ats_score: j.ats_score,
+                    reasoning: j.match_reasoning,
+                    location: 'Remote'
+                }));
+                displayJobs(jobs, container);
+                showToast(`Found ${jobs.length} job matches!`, 'success');
+            } else if (data.raw_markdown) {
+                const jobs = parseJobsFromMarkdown(data.raw_markdown);
                 displayJobs(jobs, container);
                 showToast(`Found ${jobs.length} job matches!`, 'success');
             } else {
@@ -482,13 +493,13 @@ function displayJobs(jobs, container) {
     }
 
     container.innerHTML = jobs.map((job, index) => {
-        const matchScore = 95 - index * 5;
+        const matchScore = job.ats_score || (95 - index * 5);
         const matchColor = matchScore >= 85 ? 'text-green-400 bg-green-400/10' :
             matchScore >= 70 ? 'text-yellow-400 bg-yellow-400/10' :
                 'text-orange-400 bg-orange-400/10';
 
         return `
-            <div class="job-card group p-5 rounded-xl bg-card border border-white/5 hover:border-primary/50 cursor-pointer relative overflow-hidden">
+            <div class="job-card group p-5 rounded-xl bg-card border border-white/5 hover:border-primary/50 cursor-pointer relative overflow-hidden" title="${escapeHtml(job.reasoning || '')}">
                 <div class="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full pointer-events-none"></div>
 
                 <div class="relative z-10">
@@ -586,9 +597,11 @@ function addChatMessage(content, role, isError = false) {
         <div class="w-10 h-10 rounded-xl ${isUser ? 'bg-gray-600' : 'bg-gradient-to-br from-primary to-secondary'} flex items-center justify-center flex-shrink-0 shadow-lg ${isUser ? '' : 'shadow-primary/25'}">
             <span class="text-lg">${isUser ? '👤' : '🤖'}</span>
         </div>
-        <div class="flex-1">
-            <div class="${isUser ? 'bg-gradient-to-br from-primary/20 to-primary/10 rounded-tr-none' : isError ? 'bg-red-500/10 border-red-500/20' : 'bg-gradient-to-br from-white/5 to-white/10 border-white/5'} rounded-2xl ${isUser ? 'rounded-tl-none' : 'rounded-tl-none'} p-4 max-w-[85%] backdrop-blur-sm border ${isUser ? '' : 'border-white/5'}">
-                <p class="text-sm leading-relaxed ${isError ? 'text-red-300' : ''}">${escapeHtml(content)}</p>
+        <div class="flex-1 overflow-hidden">
+            <div class="${isUser ? 'bg-gradient-to-br from-primary/20 to-primary/10 rounded-tr-none' : isError ? 'bg-red-500/10 border-red-500/20' : 'bg-gradient-to-br from-white/5 to-white/10 border-white/5'} rounded-2xl ${isUser ? 'rounded-tl-none' : 'rounded-tl-none'} p-4 max-w-[95%] backdrop-blur-sm border ${isUser ? '' : 'border-white/5'}">
+                <div class="markdown-body text-sm leading-relaxed ${isError ? 'text-red-300' : ''}">
+                    ${isUser ? `<p>${escapeHtml(content)}</p>` : marked.parse(content)}
+                </div>
             </div>
         </div>
     `;
