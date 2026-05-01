@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+python-multipart
+crewai[tools]
+langchain
+langchain-community
+pypdf
+scikit-learn
+requests
+langchain-groq
+langchain-google-genai
+python-dotenv
+beautifulsoup4
+faiss-cpu
+PyPDF2
+litellm
