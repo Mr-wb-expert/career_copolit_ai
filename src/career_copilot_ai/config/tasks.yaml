@@ -1,4 +1,4 @@
-scrape_jobs_task:
+identify_skill_gaps_task:
   description: >
     Search for remote job opportunities using THREE sources:
 
@@ -20,26 +20,62 @@ scrape_jobs_task:
   expected_output: >
     A markdown formatted list of the top 8-10 job opportunities across all sources.
     Include the Job Title, Company, Link, and a brief description for each job.
-  agent: job_scraper
-
+  agent: job_hunter
 
 ats_scoring_task:
   description: >
-    Review the top 8-10 jobs provided by the scraper. Compare each job against the user's resume:
-    {resume}
-    
-    For each job, provide:
-    1. An ATS Score out of 100 based on keyword match and experience alignment.
-    2. A list of missing keywords in the resume that are required/preferred for the job.
-    3. A short explanation of why this job is being displayed to the user (the reasoning for the match).
-  expected_output: >
-    A structured JSON list of the top jobs, where each job contains the job title, company, link, the ATS score, missing keywords, and the reasoning for the match.
-  agent: ats_scorer
+    Using the job listings from identify_skill_gaps_task, perform deep ATS
+    evaluation and scoring. For each job, calculate:
 
-career_coaching_task:
-  description: >
-    The user has asked a question: "{user_query}"
-    Answer the question while providing actionable career advice based on the user's resume: "{resume}"
+    1. Overall match percentage (0-100)
+    2. Exact keyword matches between resume and job description
+    3. Missing critical skills that appear in the job but not resume
+    4. ATS compatibility score based on formatting and keyword density
+    5. Brief summary explaining the match quality
+
+    Then provide comprehensive resume optimization recommendations:
+    - Keyword optimization - integrate missing high-value keywords naturally
+    - Bullet point rewriting - strengthen impact and quantify achievements
+    - Skills section restructuring - align with target job requirements
+    - Summary/profile optimization - highlight most relevant experience
+
+    Provide specific rewritten content, not just suggestions.
   expected_output: >
-    A helpful, friendly, and actionable response answering the user's question.
-  agent: career_coach
+    A complete resume optimization package with scored jobs:
+    - top_jobs: List of jobs with title, company, link, ats_score, missing_keywords, match_reasoning
+    - keyword_recommendations: List of keywords to add with placement suggestions
+    - rewritten_sections: Specific sections with before/after comparisons
+    - new_bullet_points: 3-5 strengthened bullet points per relevant role
+    - skills_section_proposal: Reorganized skills hierarchy
+    - summary_rewrite: Optimized professional summary
+    - formatting_tips: ATS-friendly formatting recommendations
+    - confidence_score: Estimated improvement in ATS score (0-100)
+  agent: ats_analyst
+  context:
+    - identify_skill_gaps_task
+  output_file: output/resume_optimization.md
+
+provide_strategic_guidance_task:
+  description: >
+    Synthesize all findings into a cohesive career action plan. Address:
+
+    1. Immediate actions - jobs to apply to this week
+    2. Short-term goals (1-4 weeks) - skills to learn, applications to submit
+    3. Medium-term goals (1-3 months) - projects, certifications, networking
+    4. Application strategy - which jobs to prioritize and why
+
+    Include motivational messaging and realistic timelines.
+  expected_output: >
+    A strategic career action plan containing:
+    - executive_summary: 2-paragraph overview of current position
+    - target_jobs: Top 5 jobs to apply for with reasoning
+    - immediate_actions: Checklist for this week
+    - skill_building_plan: 30-60-90 day learning roadmap
+    - application_timeline: Suggested application schedule
+    - networking_suggestions: Types of connections to make
+    - success_metrics: How to measure progress
+  agent: career_strategist
+  context:
+    - identify_skill_gaps_task
+    - ats_scoring_task
+  output_file: output/career_action_plan.md
