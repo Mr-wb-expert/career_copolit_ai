@@ -23,7 +23,7 @@ if _SRC not in sys.path:
 app = FastAPI(
     title="CareerCopilot-AI API",
     description="Agentic job matching and career coaching backend.",
-    version="1.0.0",
+    version="1.0.1",
 )
 
 # Ensure required directories exist
