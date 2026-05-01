@@ -76,7 +76,7 @@ class CareerCopilotAi():
         )
 
     @task
-    def optimize_resume_task(self) -> Task:
+    def ats_scoring_task(self) -> Task:
         return Task(
             config=self.tasks_config['ats_scoring_task'], # type: ignore[index]
         )
