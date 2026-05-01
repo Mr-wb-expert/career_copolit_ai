@@ -79,6 +79,7 @@ class CareerCopilotAi():
     def ats_scoring_task(self) -> Task:
         return Task(
             config=self.tasks_config['ats_scoring_task'], # type: ignore[index]
+            output_pydantic=JobReport
         )
 
     @task

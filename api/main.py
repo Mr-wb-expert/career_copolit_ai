@@ -120,7 +120,7 @@ def _run_pipeline_sync(job_id: str, resume_text: str, websites: str, user_query:
             "status": "done",
             "result": {
                 "raw": result.raw,
-                "jobs": _session["job_results"].model_dump() if _session["job_results"] else None,
+                "jobs": _session["job_results"].model_dump().get("top_jobs") if _session["job_results"] else None,
             },
             "error": None,
             "completed_at": datetime.utcnow().isoformat(),
