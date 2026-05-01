@@ -13,7 +13,7 @@ import os
 #   • career_strategist  → Gemini (strategic planning and guidance)
 # ---------------------------------------------------------------------------
 _GROQ_LLM = LLM(
-    model="groq/llama-3.3-70b-versatile",
+    model="groq/llama-3.1-8b-instant",
     api_key=os.environ.get("GROQ_API_KEY"),
     temperature=0.3,       # Lower = more consistent tool calls
 )
@@ -76,7 +76,7 @@ class CareerCopilotAi():
         )
 
     @task
-    def ats_scoring_task(self) -> Task:
+    def optimize_resume_task(self) -> Task:
         return Task(
             config=self.tasks_config['ats_scoring_task'], # type: ignore[index]
         )
