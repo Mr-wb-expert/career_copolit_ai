@@ -314,7 +314,7 @@ async function pollStatus(jobId) {
                 document.getElementById('generate-btn').disabled = false;
                 showToast('Career plan generated successfully!', 'success');
 
-                // Display results with animation
+                // Display results with Markdown rendering
                 displayResults(data.result);
 
                 // Auto-fetch jobs
@@ -339,37 +339,21 @@ async function pollStatus(jobId) {
 
 function displayResults(result) {
     const careerPlanOutput = document.getElementById('career-plan-output');
-    const resumeOptOutput = document.getElementById('resume-optimization-output');
+    const rawMarkdown = result && result.raw ? result.raw : (typeof result === 'string' ? result : '');
 
-    if (result && result.raw) {
-        // Parse the markdown output
-        const markdown = parseMarkdown(result.raw);
-        const sections = markdown.split(/<br><br>+|<br\/><br\/>+/);
-
-        // Career plan - first half
-        careerPlanOutput.innerHTML = sections.slice(0, 4).map((section, i) =>
-            `<div class="pb-3 ${i < 3 ? 'border-b border-white/5' : ''}">${section}</div>`
-        ).join('');
-
-        // Resume optimization - second half
-        resumeOptOutput.innerHTML = sections.slice(4, 8).map((section, i) =>
-            `<div class="pb-3 ${i < 3 ? 'border-b border-white/5' : ''}">${section}</div>`
-        ).join('');
+    if (rawMarkdown) {
+        if (typeof marked !== 'undefined') {
+            careerPlanOutput.innerHTML = `<div class="markdown-body">${marked.parse(rawMarkdown)}</div>`;
+        } else {
+            careerPlanOutput.textContent = rawMarkdown;
+        }
     } else {
         careerPlanOutput.innerHTML = `
             <div class="flex items-center gap-3 text-gray-500">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
-                Results available in raw format
-            </div>
-        `;
-        resumeOptOutput.innerHTML = `
-            <div class="flex items-center gap-3 text-gray-500">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                Check the Jobs section for matches
+                Plan data available in raw format
             </div>
         `;
     }
@@ -394,30 +378,39 @@ async function fetchJobs() {
             emptyState.classList.add('hidden');
             container.classList.remove('hidden');
 
-            if (data.jobs && data.jobs.top_jobs) {
-                const jobs = data.jobs.top_jobs.map(j => ({
-                    title: j.job_title,
-                    company: j.company,
-                    link: j.link,
-                    ats_score: j.ats_score,
-                    reasoning: j.match_reasoning,
-                    location: 'Remote'
+            // 1. Try to get jobs from the structured 'jobs' object
+            let jobsList = [];
+            if (data.jobs) {
+                const source = data.jobs.top_jobs || (Array.isArray(data.jobs) ? data.jobs : []);
+                jobsList = source.map(j => ({
+                    title: j.job_title || j.title || 'Job Position',
+                    company: j.company || 'Company',
+                    link: j.link || '#',
+                    ats_score: j.ats_score || 0,
+                    reasoning: j.match_reasoning || j.reasoning || '',
+                    location: j.location || 'Remote'
                 }));
-                displayJobs(jobs, container);
-                showToast(`Found ${jobs.length} job matches!`, 'success');
-            } else if (data.raw_markdown) {
-                const jobs = parseJobsFromMarkdown(data.raw_markdown);
-                displayJobs(jobs, container);
-                showToast(`Found ${jobs.length} job matches!`, 'success');
+            }
+
+            // 2. If no structured jobs, try parsing from markdown
+            if (jobsList.length === 0 && data.raw_markdown) {
+                jobsList = parseJobsFromMarkdown(data.raw_markdown);
+            }
+
+            // 3. Display the results
+            if (jobsList.length > 0) {
+                displayJobs(jobsList, container);
+                showToast(`Found ${jobsList.length} job matches!`, 'success');
             } else {
                 container.innerHTML = `
                     <div class="col-span-full text-center py-12">
                         <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
                             <span class="text-2xl">📭</span>
                         </div>
-                        <p class="text-gray-400">No jobs found. Try generating a career plan first.</p>
+                        <p class="text-gray-400">No jobs found. Try running the career plan again.</p>
                     </div>
                 `;
+                showToast('Found 0 job matches', 'info');
             }
         } else {
             showToast(data.detail || 'Failed to fetch jobs', 'error');
@@ -448,35 +441,50 @@ async function fetchJobs() {
 
 function parseJobsFromMarkdown(markdown) {
     const jobs = [];
+    if (!markdown) return jobs;
+    
     const lines = markdown.split('\n');
-    let currentJob = {};
+    let currentJob = null;
 
     for (const line of lines) {
-        if (line.includes('**') && line.includes('at')) {
-            if (currentJob.title) {
-                jobs.push({ ...currentJob });
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // Pattern 1: **Title** at Company
+        // Pattern 2: **Title (Company)**:
+        // Pattern 3: **Title** - Company
+        const patterns = [
+            /\*\*(.+?)\*\*\s+at\s+(.+)/,
+            /\d+\.\s+\*\*(.+?)\s+\((.+?)\)\*\*/,
+            /\*\*(.+?)\*\*\s+-\s+(.+)/,
+            /\d+\.\s+\*\*(.+?)\*\*:\s+(.+)/
+        ];
+
+        let match = null;
+        for (const regex of patterns) {
+            match = trimmed.match(regex);
+            if (match) break;
+        }
+
+        if (match) {
+            if (currentJob) jobs.push(currentJob);
+            currentJob = {
+                title: match[1].trim(),
+                company: match[2].replace(':', '').trim(),
+                link: '#',
+                location: 'Remote'
+            };
+        } else if (currentJob) {
+            if (trimmed.toLowerCase().includes('link:') || trimmed.toLowerCase().includes('url:')) {
+                currentJob.link = trimmed.split(':')[1]?.trim() || '#';
+            } else if (trimmed.toLowerCase().includes('reasoning:')) {
+                currentJob.reasoning = trimmed.split(':')[1]?.trim();
             }
-            const match = line.match(/\*\*(.+?)\*\*\s+at\s+(.+)/);
-            if (match) {
-                currentJob = {
-                    title: match[1],
-                    company: match[2]
-                };
-            }
-        } else if (line.includes('Link:') || line.includes('link:')) {
-            currentJob.link = line.split(':')[1]?.trim();
-        } else if (line.includes('Location:') || line.includes('location:')) {
-            currentJob.location = line.split(':')[1]?.trim();
-        } else if (line.includes('Remote') || line.includes('hybrid') || line.includes('On-site')) {
-            currentJob.type = line.trim();
         }
     }
 
-    if (currentJob.title) {
-        jobs.push(currentJob);
-    }
-
-    return jobs.slice(0, 9);
+    if (currentJob) jobs.push(currentJob);
+    return jobs.filter(j => j.title).slice(0, 10);
 }
 
 function displayJobs(jobs, container) {
