@@ -19,7 +19,7 @@ _GROQ_LLM = LLM(
 )
 
 _GEMINI_LLM = LLM(
-    model="gemini/gemini-2.5-flash-lite", # Using latest stable flash for speed & quality
+    model="gemini/gemini-2.5-flash-lite",
     api_key=os.environ.get("GOOGLE_API_KEY"),
     temperature=0.5,
 )
